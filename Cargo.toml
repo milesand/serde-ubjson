@@ -1,0 +1,8 @@
+[package]
+name = "serde-ubjson"
+version = "0.1.0"
+authors = ["Jewoo Lee <shema7k@gmail.com>"]
+
+[dependencies]
+serde = "^1.0"
+byteorder = "^1.1"
