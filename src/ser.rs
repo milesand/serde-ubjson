@@ -171,15 +171,30 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             .write_u8(b'S')
             .map_err(|err| Error::Io(err))
             .and_then(|_| self.serialize_u64(v.len() as u64))
-            .and_then(|_| self.inner.write(v.as_bytes()).map_err(|err| Error::Io(err)))
+            .and_then(|_| {
+                          self.inner
+                              .write(v.as_bytes())
+                              .map(|_| ())
+                              .map_err(|err| Error::Io(err))
+                      })
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        unimplemented!()
+        self.inner
+            .write(b"[$U")
+            .map(|_| ())
+            .map_err(|err| Error::Io(err))
+            .and_then(|_| self.serialize_u64(v.len() as u64))
+            .and_then(|_| {
+                          self.inner
+                              .write(v)
+                              .map(|_| ())
+                              .map_err(|err| Error::Io(err))
+                      })
     }
 
     fn serialize_none(self) -> Result<()> {
-        unimplemented!()
+        self.inner.write_u8(b'Z').map_err(|err| Error::Io(err))
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<()>
