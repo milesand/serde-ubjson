@@ -181,7 +181,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         self.inner
-            .write(b"[$U")
+            .write(b"[$U#")
             .map(|_| ())
             .map_err(|err| Error::Io(err))
             .and_then(|_| self.serialize_u64(v.len() as u64))
@@ -200,11 +200,11 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        value.serialize(self)
     }
 
     fn serialize_unit(self) -> Result<()> {
-        unimplemented!()
+        self.serialize_none()
     }
 
     fn serialize_unit_struct(self, name: &'static str) -> Result<()> {
