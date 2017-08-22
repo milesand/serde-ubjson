@@ -3,7 +3,8 @@
 use std::io::Write;
 
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use serde::ser::{self, Serialize};
+use serde::ser::{self, Serialize, SerializeSeq, SerializeTuple, SerializeTupleStruct,
+                 SerializeTupleVariant, SerializeMap, SerializeStruct, SerializeStructVariant};
 
 use error::{Error, Result};
 
@@ -48,6 +49,9 @@ impl<W> Serializer<W>
 impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
     type Ok = ();
     type Error = Error;
+    
+    type SerializeSeq = Compound<'a, W>;
+    type SerializeTuple = Compound<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
         self.inner
@@ -171,11 +175,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             .write_u8(b'S')
             .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
-            .and_then(|_| {
-                          self.inner
-                              .write_all(v.as_bytes())
-                              .map_err(Error::Io)
-                      })
+            .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
@@ -183,11 +183,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             .write_all(b"[$U#")
             .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
-            .and_then(|_| {
-                          self.inner
-                              .write_all(v.as_bytes())
-                              .map_err(Error::Io)
-                      })
+            .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
     }
 
     fn serialize_none(self) -> Result<()> {
@@ -205,7 +201,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_unit_struct(self, name: &'static str) -> Result<()> {
-        unimplemented!()
+        self.serialize_none()
     }
 
     fn serialize_unit_variant(self,
@@ -219,7 +215,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_newtype_struct<T: ?Sized>(self, name: &'static str, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        value.serialize(self)
     }
 
     fn serialize_newtype_variant<T: ?Sized>(self,
@@ -231,5 +227,63 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
         where T: Serialize
     {
         unimplemented!()
+    }
+    
+    fn serialize_seq(self, len: Option<usize>) -> Result<Compound<'a, W>> {
+        if let Some(len) = len {
+            self.serialize_tuple(self, len)
+        } else {
+            self.inner.write_u8(b'[').map_err(Error::Io)?;
+            Ok(Compound {
+                ser: self,
+                length_known: false,
+            })
+        }
+    }
+    
+    fn serialize_tuple(self, len: usize) -> Result<Compound<'a, W>> {
+        self.inner.write_all(b"[#").map_err(Error::Io)?;
+        self.serialize_u64(len as u64)?;
+        Ok(Compound {
+            ser: self,
+            length_known: true,
+        })
+    }
+}
+
+#[doc(hidden)]
+pub struct Compound<'a, W: 'a> {
+    ser: &'a mut Serializer<W>,
+    length_known: bool,
+}
+
+impl<'a, W: 'a> SerializeSeq for Compound<'a, W> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        value.serialize(self.ser)
+    }
+
+    fn end(self) -> Result<()> {
+        if self.length_known {
+            Ok(())
+        } else {
+            self.ser.inner.write_u8(b']').map_err(Error::Io)
+        }
+    }
+}
+
+impl <'a, W: 'a> SerializeTuple for Compound<'a, W> {
+    type Ok = ();
+    type Error = Error;
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()> where T: Serialize {
+        SerializeSeq::serialize_element(self, value)
+    }
+    
+    fn end(self) -> Result<()> {
+        SerializeSeq::end(self)
     }
 }
