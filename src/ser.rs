@@ -55,14 +55,14 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
                           true => b'T',
                           false => b'F',
                       })
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
         self.inner
             .write_u8(b'i')
             .and_then(|_| self.inner.write_i8(v))
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
     }
 
     fn serialize_i16(self, v: i16) -> Result<()> {
@@ -72,7 +72,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             self.inner
                 .write_u8(b'I')
                 .and_then(|_| self.inner.write_i16::<BigEndian>(v))
-                .map_err(|err| Error::Io(err))
+                .map_err(Error::Io)
         }
     }
 
@@ -83,7 +83,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             self.inner
                 .write_u8(b'l')
                 .and_then(|_| self.inner.write_i32::<BigEndian>(v))
-                .map_err(|err| Error::Io(err))
+                .map_err(Error::Io)
         }
     }
 
@@ -102,7 +102,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
         self.inner
             .write_u8(b'U')
             .and_then(|_| self.inner.write_u8(v))
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
     }
 
     fn serialize_u16(self, v: u16) -> Result<()> {
@@ -134,9 +134,9 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             let v = v.to_string();
             self.inner
                 .write_u8(b'H')
-                .map_err(|err| Error::Io(err))
+                .map_err(Error::Io)
                 .and_then(|_| self.serialize_u64(v.len()))
-                .and_then(|_| self.inner.write(v.as_bytes()).map_err(|err| Error::Io(err)))
+                .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
         }
     }
 
@@ -144,14 +144,14 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
         self.inner
             .write_u8(b'd')
             .and_then(|_| self.inner.write_f32::<BigEndian>(v))
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
     }
 
     fn serialize_f64(self, v: f64) -> Result<()> {
         self.inner
             .write_u8(b'D')
             .and_then(|_| self.inner.write_f64::<BigEndian>(v))
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
     }
 
     fn serialize_char(self, v: char) -> Result<()> {
@@ -160,7 +160,7 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
             self.inner
                 .write_u8(b'C')
                 .and_then(|_| self.inner.write_u8(v as u8))
-                .map_err(|err| Error::Io(err))
+                .map_err(Error::Io)
         } else {
             self.serialize_u32(v)
         }
@@ -169,32 +169,29 @@ impl<'a, W> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_str(self, v: &str) -> Result<()> {
         self.inner
             .write_u8(b'S')
-            .map_err(|err| Error::Io(err))
+            .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
             .and_then(|_| {
                           self.inner
-                              .write(v.as_bytes())
-                              .map(|_| ())
-                              .map_err(|err| Error::Io(err))
+                              .write_all(v.as_bytes())
+                              .map_err(Error::Io)
                       })
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         self.inner
-            .write(b"[$U#")
-            .map(|_| ())
-            .map_err(|err| Error::Io(err))
+            .write_all(b"[$U#")
+            .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
             .and_then(|_| {
                           self.inner
-                              .write(v)
-                              .map(|_| ())
-                              .map_err(|err| Error::Io(err))
+                              .write_all(v.as_bytes())
+                              .map_err(Error::Io)
                       })
     }
 
     fn serialize_none(self) -> Result<()> {
-        self.inner.write_u8(b'Z').map_err(|err| Error::Io(err))
+        self.inner.write_u8(b'Z').map_err(Error::Io)
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<()>
