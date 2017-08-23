@@ -5,4 +5,4 @@ mod error;
 mod ser;
 
 pub use error::{Error, Result};
-pub use ser::{to_vec, Serializer};
+pub use ser::{to_vec, to_writer, Serializer};
