@@ -206,10 +206,10 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_unit_variant(self,
                               _name: &'static str,
-                              _variant_index: u32,
+                              variant_index: u32,
                               _variant: &'static str)
                               -> Result<()> {
-        unimplemented!()
+        self.serialize_u32(variant_index)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<()>
@@ -220,13 +220,16 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_newtype_variant<T: ?Sized>(self,
                                             _name: &'static str,
-                                            _variant_index: u32,
+                                            variant_index: u32,
                                             _variant: &'static str,
-                                            _value: &T)
+                                            value: &T)
                                             -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        let mut tup = self.serialize_tuple(2)?;
+        SerializeTuple::serialize_element(&mut tup, &variant_index)?;
+        SerializeTuple::serialize_element(&mut tup, value)?;
+        SerializeTuple::end(tup)
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Compound<'a, W>> {
@@ -254,8 +257,8 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
            })
     }
 
-    fn serialize_tuple_struct(self, _name: &'static str, _len: usize) -> Result<Compound<'a, W>> {
-        unimplemented!()
+    fn serialize_tuple_struct(self, _name: &'static str, len: usize) -> Result<Compound<'a, W>> {
+        self.serialize_tuple(len)
     }
 
     fn serialize_tuple_variant(self,
