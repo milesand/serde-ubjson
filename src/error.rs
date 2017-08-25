@@ -7,20 +7,9 @@ use serde::{ser, de};
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
-pub struct Error {
-    err: ErrorImpl,
-}
-
-#[derive(Debug)]
-enum ErrorImpl {
+pub enum Error {
     Message(String),
     Io(io::Error),
-}
-
-impl Error {
-    pub fn io(err: io::Error) -> Self {
-        Error { err: ErrorImpl::Io(err) }
-    }
 }
 
 impl Display for Error {
@@ -31,9 +20,9 @@ impl Display for Error {
 
 impl std::error::Error for Error {
     fn description(&self) -> &str {
-        match self.err {
-            ErrorImpl::Message(ref msg) => msg,
-            ErrorImpl::Io(ref err) => err.description(),
+        match *self {
+            Error::Message(ref msg) => msg,
+            Error::Io(ref err) => err.description(),
         }
     }
 }
@@ -42,7 +31,7 @@ impl ser::Error for Error {
     fn custom<T>(msg: T) -> Self
         where T: Display
     {
-        Error { err: ErrorImpl::Message(msg.to_string()) }
+        Error::Message(msg.to_string())
     }
 }
 
@@ -50,6 +39,6 @@ impl de::Error for Error {
     fn custom<T>(msg: T) -> Self
         where T: Display
     {
-        Error { err: ErrorImpl::Message(msg.to_string()) }
+        Error::Message(msg.to_string())
     }
 }
