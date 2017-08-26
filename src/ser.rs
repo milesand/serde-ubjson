@@ -263,28 +263,30 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_tuple_variant(self,
                                _name: &'static str,
-                               _variant_index: u32,
+                               variant_index: u32,
                                _variant: &'static str,
-                               _len: usize)
+                               len: usize)
                                -> Result<Compound<'a, W>> {
-        unimplemented!()
+        let mut tup = self.serialize_tuple(len + 1)?;
+        SerializeTuple::serialize_element(&mut tup, &variant_index)?;
+        Ok(tup)
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Compound<'a, W>> {
         unimplemented!()
     }
 
-    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Compound<'a, W>> {
-        unimplemented!()
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Compound<'a, W>> {
+        self.serialize_tuple(len)
     }
 
     fn serialize_struct_variant(self,
-                                _name: &'static str,
-                                _variant_index: u32,
-                                _variant: &'static str,
-                                _len: usize)
+                                name: &'static str,
+                                variant_index: u32,
+                                variant: &'static str,
+                                len: usize)
                                 -> Result<Compound<'a, W>> {
-        unimplemented!()
+        self.serialize_tuple_variant(name, variant_index, variant, len)
     }
 }
 
@@ -341,14 +343,14 @@ impl<'a, W: 'a> SerializeTupleStruct for Compound<'a, W>
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        SerializeSeq::serialize_element(self, value)
     }
 
     fn end(self) -> Result<()> {
-        unimplemented!()
+        SerializeSeq::end(self)
     }
 }
 
@@ -358,14 +360,14 @@ impl<'a, W: 'a> SerializeTupleVariant for Compound<'a, W>
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        SerializeSeq::serialize_element(self, value)
     }
 
     fn end(self) -> Result<()> {
-        unimplemented!()
+        SerializeSeq::end(self)
     }
 }
 
@@ -398,14 +400,14 @@ impl<'a, W: 'a> SerializeStruct for Compound<'a, W>
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, _value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        SerializeSeq::serialize_element(self, value)
     }
 
     fn end(self) -> Result<()> {
-        unimplemented!()
+        SerializeSeq::end(self)
     }
 }
 
@@ -415,13 +417,13 @@ impl<'a, W: 'a> SerializeStructVariant for Compound<'a, W>
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, _value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        SerializeSeq::serialize_element(self, value)
     }
 
     fn end(self) -> Result<()> {
-        unimplemented!()
+        SerializeSeq::end(self)
     }
 }
