@@ -3,10 +3,12 @@
 use std::io::Write;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use serde::ser::{self, Serialize, SerializeSeq, SerializeTuple, SerializeTupleStruct,
+use serde::ser::{self, Impossible, Serialize, SerializeSeq, SerializeTuple, SerializeTupleStruct,
                  SerializeTupleVariant, SerializeMap, SerializeStruct, SerializeStructVariant};
 
 use error::{Error, Result};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Serialize the given value as a UBJSON byte vector.
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
@@ -26,6 +28,8 @@ pub fn to_writer<T, W>(writer: W, value: &T) -> Result<()>
     value.serialize(&mut serializer)?;
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Structure for serializing Rust values into UBJSON.
 pub struct Serializer<W> {
@@ -272,8 +276,25 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         Ok(tup)
     }
 
-    fn serialize_map(self, _len: Option<usize>) -> Result<Compound<'a, W>> {
-        unimplemented!()
+    fn serialize_map(self, len: Option<usize>) -> Result<Compound<'a, W>> {
+        if let Some(len) = len {
+            self.inner
+                .write_all(b"{#")
+                .map_err(Error::Io)?;
+            len.serialize(&mut *self)?;
+            Ok(Compound {
+                   ser: self,
+                   length_known: true,
+               })
+        } else {
+            self.inner
+                .write_u8(b'{')
+                .map_err(Error::Io)?;
+            Ok(Compound {
+                   ser: self,
+                   length_known: false,
+               })
+        }
     }
 
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Compound<'a, W>> {
@@ -289,6 +310,8 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_tuple_variant(name, variant_index, variant, len)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[doc(hidden)]
 pub struct Compound<'a, W: 'a> {
@@ -377,20 +400,20 @@ impl<'a, W: 'a> SerializeMap for Compound<'a, W>
     type Ok = ();
     type Error = Error;
 
-    fn serialize_key<T: ?Sized>(&mut self, _key: &T) -> Result<()>
+    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        key.serialize(MapKeySerializer { ser: &mut *self.ser })
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, _value: &T) -> Result<()>
+    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<()>
         where T: Serialize
     {
-        unimplemented!()
+        value.serialize(&mut *self.ser)
     }
 
     fn end(self) -> Result<()> {
-        unimplemented!()
+        Ok(())
     }
 }
 
@@ -425,5 +448,170 @@ impl<'a, W: 'a> SerializeStructVariant for Compound<'a, W>
 
     fn end(self) -> Result<()> {
         SerializeSeq::end(self)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct MapKeySerializer<'a, W: 'a> {
+    ser: &'a mut Serializer<W>,
+}
+
+impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    type SerializeSeq = Impossible<(), Error>;
+    type SerializeTuple = Impossible<(), Error>;
+    type SerializeTupleStruct = Impossible<(), Error>;
+    type SerializeTupleVariant = Impossible<(), Error>;
+    type SerializeMap = Impossible<(), Error>;
+    type SerializeStruct = Impossible<(), Error>;
+    type SerializeStructVariant = Impossible<(), Error>;
+
+    fn serialize_str(self, v: &str) -> Result<()> {
+        v.len().serialize(&mut *self.ser)?;
+        self.ser
+            .inner
+            .write_all(v.as_bytes())
+            .map_err(Error::Io)
+    }
+
+    fn serialize_bool(self, _v: bool) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_i8(self, _v: i8) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_i16(self, _v: i16) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_i32(self, _v: i32) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_i64(self, _v: i64) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_u8(self, _v: u8) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_u16(self, _v: u16) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_u32(self, _v: u32) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_u64(self, _v: u64) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_f32(self, _v: f32) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_f64(self, _v: f64) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_char(self, _v: char) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_bytes(self, _v: &[u8]) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_none(self) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_some<T: ?Sized>(self, _v: &T) -> Result<()>
+        where T: Serialize
+    {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_unit(self) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_unit_variant(self,
+                              _name: &'static str,
+                              _variant_index: u32,
+                              _variant: &'static str)
+                              -> Result<()> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, _value: &T) -> Result<()>
+        where T: Serialize
+    {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_newtype_variant<T: ?Sized>(self,
+                                            _name: &'static str,
+                                            _variant_index: u32,
+                                            _variant: &'static str,
+                                            _value: &T)
+                                            -> Result<()>
+        where T: Serialize
+    {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_tuple_struct(self,
+                              _name: &'static str,
+                              _len: usize)
+                              -> Result<Self::SerializeTupleStruct> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_tuple_variant(self,
+                               _name: &'static str,
+                               _variant_index: u32,
+                               _variant: &'static str,
+                               _len: usize)
+                               -> Result<Self::SerializeTupleVariant> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
+        Err(Error::KeyMustBeAString)
+    }
+
+    fn serialize_struct_variant(self,
+                                _name: &'static str,
+                                _variant_index: u32,
+                                _variant: &'static str,
+                                _len: usize)
+                                -> Result<Self::SerializeStructVariant> {
+        Err(Error::KeyMustBeAString)
     }
 }

@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     Message(String),
     Io(io::Error),
+    KeyMustBeAString,
 }
 
 impl Display for Error {
@@ -23,6 +24,7 @@ impl std::error::Error for Error {
         match *self {
             Error::Message(ref msg) => msg,
             Error::Io(ref err) => err.description(),
+            Error::KeyMustBeAString => "key must be a string",
         }
     }
 }
