@@ -3,8 +3,7 @@
 use std::io::Write;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use serde::ser::{self, Impossible, Serialize, SerializeSeq, SerializeTuple, SerializeTupleStruct,
-                 SerializeTupleVariant, SerializeMap, SerializeStruct, SerializeStructVariant};
+use serde::ser::{self, Impossible, Serialize};
 
 use error::{Error, Result};
 
@@ -54,13 +53,13 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     type Ok = ();
     type Error = Error;
 
-    type SerializeSeq = Compound<'a, W>;
-    type SerializeTuple = Compound<'a, W>;
-    type SerializeTupleStruct = Compound<'a, W>;
-    type SerializeTupleVariant = Compound<'a, W>;
-    type SerializeMap = Compound<'a, W>;
-    type SerializeStruct = Compound<'a, W>;
-    type SerializeStructVariant = Compound<'a, W>;
+    type SerializeSeq = Dynamic<'a, W>;
+    type SerializeTuple = Static<'a, W>;
+    type SerializeTupleStruct = Static<'a, W>;
+    type SerializeTupleVariant = Static<'a, W>;
+    type SerializeMap = Dynamic<'a, W>;
+    type SerializeStruct = Static<'a, W>;
+    type SerializeStructVariant = Static<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
         self.inner.write_u8(if v { b'T' } else { b'F' }).map_err(Error::Io)
@@ -231,37 +230,44 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         where T: Serialize
     {
         let mut tup = self.serialize_tuple(2)?;
-        SerializeTuple::serialize_element(&mut tup, &variant_index)?;
-        SerializeTuple::serialize_element(&mut tup, value)?;
-        SerializeTuple::end(tup)
+        ser::SerializeTuple::serialize_element(&mut tup, &variant_index)?;
+        ser::SerializeTuple::serialize_element(&mut tup, value)?;
+        ser::SerializeTuple::end(tup)
     }
 
-    fn serialize_seq(self, len: Option<usize>) -> Result<Compound<'a, W>> {
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         if let Some(len) = len {
-            self.serialize_tuple(len)
+            self.inner
+                .write_all(b"[#")
+                .map_err(Error::Io)?;
+            len.serialize(&mut *self)?;
+            Ok(Dynamic {
+                   ser: self,
+                   length_known: true,
+               })
         } else {
             self.inner
                 .write_u8(b'[')
                 .map_err(Error::Io)?;
-            Ok(Compound {
+            Ok(Dynamic {
                    ser: self,
                    length_known: false,
                })
         }
     }
 
-    fn serialize_tuple(self, len: usize) -> Result<Compound<'a, W>> {
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
         self.inner
             .write_all(b"[#")
             .map_err(Error::Io)?;
         self.serialize_u64(len as u64)?;
-        Ok(Compound {
-               ser: self,
-               length_known: true,
-           })
+        Ok(Static { ser: self })
     }
 
-    fn serialize_tuple_struct(self, _name: &'static str, len: usize) -> Result<Compound<'a, W>> {
+    fn serialize_tuple_struct(self,
+                              _name: &'static str,
+                              len: usize)
+                              -> Result<Self::SerializeTupleStruct> {
         self.serialize_tuple(len)
     }
 
@@ -270,19 +276,19 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
                                variant_index: u32,
                                _variant: &'static str,
                                len: usize)
-                               -> Result<Compound<'a, W>> {
+                               -> Result<Self::SerializeTupleVariant> {
         let mut tup = self.serialize_tuple(len + 1)?;
-        SerializeTuple::serialize_element(&mut tup, &variant_index)?;
+        ser::SerializeTuple::serialize_element(&mut tup, &variant_index)?;
         Ok(tup)
     }
 
-    fn serialize_map(self, len: Option<usize>) -> Result<Compound<'a, W>> {
+    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
         if let Some(len) = len {
             self.inner
                 .write_all(b"{#")
                 .map_err(Error::Io)?;
             len.serialize(&mut *self)?;
-            Ok(Compound {
+            Ok(Dynamic {
                    ser: self,
                    length_known: true,
                })
@@ -290,14 +296,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.inner
                 .write_u8(b'{')
                 .map_err(Error::Io)?;
-            Ok(Compound {
+            Ok(Dynamic {
                    ser: self,
                    length_known: false,
                })
         }
     }
 
-    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Compound<'a, W>> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.serialize_tuple(len)
     }
 
@@ -306,7 +312,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
                                 variant_index: u32,
                                 variant: &'static str,
                                 len: usize)
-                                -> Result<Compound<'a, W>> {
+                                -> Result<Self::SerializeStructVariant> {
         self.serialize_tuple_variant(name, variant_index, variant, len)
     }
 }
@@ -314,12 +320,106 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[doc(hidden)]
-pub struct Compound<'a, W: 'a> {
+/// Serialization handler for compound types with non-optional length (i. e. len: usize).
+pub struct Static<'a, W: 'a> {
+    ser: &'a mut Serializer<W>,
+}
+
+impl<'a, W: 'a> ser::SerializeTuple for Static<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        value.serialize(&mut *self.ser)
+    }
+
+    fn end(self) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a, W: 'a> ser::SerializeTupleStruct for Static<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        ser::SerializeTuple::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<()> {
+        ser::SerializeTuple::end(self)
+    }
+}
+
+impl<'a, W: 'a> ser::SerializeTupleVariant for Static<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        ser::SerializeTuple::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<()> {
+        ser::SerializeTuple::end(self)
+    }
+}
+
+impl<'a, W: 'a> ser::SerializeStruct for Static<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        ser::SerializeTuple::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<()> {
+        ser::SerializeTuple::end(self)
+    }
+}
+
+impl<'a, W: 'a> ser::SerializeStructVariant for Static<'a, W>
+    where W: Write
+{
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
+        where T: Serialize
+    {
+        ser::SerializeTuple::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<()> {
+        ser::SerializeTuple::end(self)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[doc(hidden)]
+/// Serialization handler for compound types with optional length (i. e. len: Option<usize>).
+pub struct Dynamic<'a, W: 'a> {
     ser: &'a mut Serializer<W>,
     length_known: bool,
 }
 
-impl<'a, W: 'a> SerializeSeq for Compound<'a, W>
+impl<'a, W: 'a> ser::SerializeSeq for Dynamic<'a, W>
     where W: Write
 {
     type Ok = ();
@@ -343,58 +443,7 @@ impl<'a, W: 'a> SerializeSeq for Compound<'a, W>
     }
 }
 
-impl<'a, W: 'a> SerializeTuple for Compound<'a, W>
-    where W: Write
-{
-    type Ok = ();
-    type Error = Error;
-
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
-    {
-        SerializeSeq::serialize_element(self, value)
-    }
-
-    fn end(self) -> Result<()> {
-        SerializeSeq::end(self)
-    }
-}
-
-impl<'a, W: 'a> SerializeTupleStruct for Compound<'a, W>
-    where W: Write
-{
-    type Ok = ();
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
-    {
-        SerializeSeq::serialize_element(self, value)
-    }
-
-    fn end(self) -> Result<()> {
-        SerializeSeq::end(self)
-    }
-}
-
-impl<'a, W: 'a> SerializeTupleVariant for Compound<'a, W>
-    where W: Write
-{
-    type Ok = ();
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
-    {
-        SerializeSeq::serialize_element(self, value)
-    }
-
-    fn end(self) -> Result<()> {
-        SerializeSeq::end(self)
-    }
-}
-
-impl<'a, W: 'a> SerializeMap for Compound<'a, W>
+impl<'a, W: 'a> ser::SerializeMap for Dynamic<'a, W>
     where W: Write
 {
     type Ok = ();
@@ -413,45 +462,16 @@ impl<'a, W: 'a> SerializeMap for Compound<'a, W>
     }
 
     fn end(self) -> Result<()> {
-        Ok(())
+        if self.length_known {
+            Ok(())
+        } else {
+            self.ser
+                .inner
+                .write_u8(b'}')
+                .map_err(Error::Io)
+        }
     }
 }
-
-impl<'a, W: 'a> SerializeStruct for Compound<'a, W>
-    where W: Write
-{
-    type Ok = ();
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
-        where T: Serialize
-    {
-        SerializeSeq::serialize_element(self, value)
-    }
-
-    fn end(self) -> Result<()> {
-        SerializeSeq::end(self)
-    }
-}
-
-impl<'a, W: 'a> SerializeStructVariant for Compound<'a, W>
-    where W: Write
-{
-    type Ok = ();
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
-        where T: Serialize
-    {
-        SerializeSeq::serialize_element(self, value)
-    }
-
-    fn end(self) -> Result<()> {
-        SerializeSeq::end(self)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct MapKeySerializer<'a, W: 'a> {
     ser: &'a mut Serializer<W>,
