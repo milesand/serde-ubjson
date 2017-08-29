@@ -1,7 +1,13 @@
 [package]
-name = "serde-ubjson"
+name = "serde_ubjson"
 version = "0.2.0"
 authors = ["Jewoo Lee <shema7k@gmail.com>"]
+license = "MIT"
+description = "UBJSON support for Serde"
+repository = "https://github.com/milesand/serde-ubjson"
+readme = "README.md"
+keywords = ["ubjson", "serde", "serialization"]
+categories = ["encoding"]
 
 [dependencies]
 serde = "^1.0"
