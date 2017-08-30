@@ -75,6 +75,8 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_i16(self, v: i16) -> Result<()> {
         if (i8::min_value() as i16 <= v) && (v <= i8::max_value() as i16) {
             self.serialize_i8(v as i8)
+        } else if (u8::min_value() as i16 <= v) && (v <= u8::max_value() as i16) {
+            self.serialize_u8(v as u8)
         } else {
             self.inner
                 .write_u8(b'I')
@@ -163,7 +165,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_char(self, v: char) -> Result<()> {
         let v: u32 = v.into();
-        if v <= u8::max_value() as u32 {
+        if v <= 127 {
             self.inner
                 .write_u8(b'C')
                 .and_then(|_| self.inner.write_u8(v as u8))
