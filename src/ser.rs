@@ -5,6 +5,7 @@ use std::io::Write;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::{self, Impossible, Serialize};
 
+use crate::marker;
 use crate::error::{Error, Result};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,12 +63,12 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     type SerializeStructVariant = Static<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
-        self.inner.write_u8(if v { b'T' } else { b'F' }).map_err(Error::Io)
+        self.inner.write_u8(if v { marker::TRUE } else { marker::FALSE }).map_err(Error::Io)
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
         self.inner
-            .write_u8(b'i')
+            .write_u8(marker::I8)
             .and_then(|_| self.inner.write_i8(v))
             .map_err(Error::Io)
     }
@@ -79,7 +80,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.serialize_u8(v as u8)
         } else {
             self.inner
-                .write_u8(b'I')
+                .write_u8(marker::I16)
                 .and_then(|_| self.inner.write_i16::<BigEndian>(v))
                 .map_err(Error::Io)
         }
@@ -90,7 +91,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.serialize_i16(v as i16)
         } else {
             self.inner
-                .write_u8(b'l')
+                .write_u8(marker::I32)
                 .and_then(|_| self.inner.write_i32::<BigEndian>(v))
                 .map_err(Error::Io)
         }
@@ -101,7 +102,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.serialize_i32(v as i32)
         } else {
             self.inner
-                .write_u8(b'L')
+                .write_u8(marker::I64)
                 .and_then(|_| self.inner.write_i64::<BigEndian>(v))
                 .map_err(Error::Io)
         }
@@ -109,7 +110,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_u8(self, v: u8) -> Result<()> {
         self.inner
-            .write_u8(b'U')
+            .write_u8(marker::U8)
             .and_then(|_| self.inner.write_u8(v))
             .map_err(Error::Io)
     }
@@ -142,7 +143,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         } else {
             let v = v.to_string();
             self.inner
-                .write_u8(b'H')
+                .write_u8(marker::HI_PRECISION)
                 .map_err(Error::Io)
                 .and_then(|_| self.serialize_u64(v.len() as u64))
                 .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
@@ -151,14 +152,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_f32(self, v: f32) -> Result<()> {
         self.inner
-            .write_u8(b'd')
+            .write_u8(marker::F32)
             .and_then(|_| self.inner.write_f32::<BigEndian>(v))
             .map_err(Error::Io)
     }
 
     fn serialize_f64(self, v: f64) -> Result<()> {
         self.inner
-            .write_u8(b'D')
+            .write_u8(marker::F64)
             .and_then(|_| self.inner.write_f64::<BigEndian>(v))
             .map_err(Error::Io)
     }
@@ -167,7 +168,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         let v: u32 = v.into();
         if v <= 127 {
             self.inner
-                .write_u8(b'C')
+                .write_u8(marker::CHAR)
                 .and_then(|_| self.inner.write_u8(v as u8))
                 .map_err(Error::Io)
         } else {
@@ -177,7 +178,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_str(self, v: &str) -> Result<()> {
         self.inner
-            .write_u8(b'S')
+            .write_u8(marker::STRING)
             .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
             .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
@@ -185,14 +186,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         self.inner
-            .write_all(b"[$U#")
+            .write_all(b"[$U#") // TODO: change this to use marker stuff
             .map_err(Error::Io)
             .and_then(|_| self.serialize_u64(v.len() as u64))
             .and_then(|_| self.inner.write_all(v).map_err(Error::Io))
     }
 
     fn serialize_none(self) -> Result<()> {
-        self.inner.write_u8(b'Z').map_err(Error::Io)
+        self.inner.write_u8(marker::NULL).map_err(Error::Io)
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<()>
@@ -240,7 +241,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         if let Some(len) = len {
             self.inner
-                .write_all(b"[#")
+                .write_all(b"[#") // TODO: change this too
                 .map_err(Error::Io)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
@@ -249,7 +250,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
                })
         } else {
             self.inner
-                .write_u8(b'[')
+                .write_u8(marker::ARR_START)
                 .map_err(Error::Io)?;
             Ok(Dynamic {
                    ser: self,
@@ -260,7 +261,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
         self.inner
-            .write_all(b"[#")
+            .write_all(b"[#") // TODO: change this too
             .map_err(Error::Io)?;
         self.serialize_u64(len as u64)?;
         Ok(Static { ser: self })
@@ -287,7 +288,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
         if let Some(len) = len {
             self.inner
-                .write_all(b"{#")
+                .write_all(b"{#") // TODO: change this too
                 .map_err(Error::Io)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
@@ -296,7 +297,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
                })
         } else {
             self.inner
-                .write_u8(b'{')
+                .write_u8(marker::OBJ_START)
                 .map_err(Error::Io)?;
             Ok(Dynamic {
                    ser: self,
@@ -439,7 +440,7 @@ impl<'a, W: 'a> ser::SerializeSeq for Dynamic<'a, W>
         } else {
             self.ser
                 .inner
-                .write_u8(b']')
+                .write_u8(marker::ARR_END)
                 .map_err(Error::Io)
         }
     }
@@ -469,7 +470,7 @@ impl<'a, W: 'a> ser::SerializeMap for Dynamic<'a, W>
         } else {
             self.ser
                 .inner
-                .write_u8(b'}')
+                .write_u8(marker::OBJ_END)
                 .map_err(Error::Io)
         }
     }
