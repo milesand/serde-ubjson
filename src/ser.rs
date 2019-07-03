@@ -67,10 +67,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
-        self.inner
-            .write_u8(marker::I8)
-            .and_then(|_| self.inner.write_i8(v))
-            .map_err(Error::Io)
+        self.inner.write_u8(marker::I8)?;
+        self.inner.write_i8(v)?;
+        Ok(())
     }
 
     fn serialize_i16(self, v: i16) -> Result<()> {
@@ -79,10 +78,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         } else if (i16::from(u8::min_value()) <= v) && (v <= i16::from(u8::max_value())) {
             self.serialize_u8(v as u8)
         } else {
-            self.inner
-                .write_u8(marker::I16)
-                .and_then(|_| self.inner.write_i16::<BigEndian>(v))
-                .map_err(Error::Io)
+            self.inner.write_u8(marker::I16)?;
+            self.inner.write_i16::<BigEndian>(v)?;
+            Ok(())
         }
     }
 
@@ -90,10 +88,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         if (i32::from(i16::min_value()) <= v) && (v <= i32::from(i16::max_value())) {
             self.serialize_i16(v as i16)
         } else {
-            self.inner
-                .write_u8(marker::I32)
-                .and_then(|_| self.inner.write_i32::<BigEndian>(v))
-                .map_err(Error::Io)
+            self.inner.write_u8(marker::I32)?;
+            self.inner.write_i32::<BigEndian>(v)?;
+            Ok(())
         }
     }
 
@@ -101,18 +98,16 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         if (i64::from(i32::min_value()) <= v) && (v <= i64::from(i32::max_value())) {
             self.serialize_i32(v as i32)
         } else {
-            self.inner
-                .write_u8(marker::I64)
-                .and_then(|_| self.inner.write_i64::<BigEndian>(v))
-                .map_err(Error::Io)
+            self.inner.write_u8(marker::I64)?;
+            self.inner.write_i64::<BigEndian>(v)?;
+            Ok(())
         }
     }
 
     fn serialize_u8(self, v: u8) -> Result<()> {
-        self.inner
-            .write_u8(marker::U8)
-            .and_then(|_| self.inner.write_u8(v))
-            .map_err(Error::Io)
+        self.inner.write_u8(marker::U8)?;
+        self.inner.write_u8(v)?;
+        Ok(())
     }
 
     fn serialize_u16(self, v: u16) -> Result<()> {
@@ -142,54 +137,49 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.serialize_i64(v as i64)
         } else {
             let v = v.to_string();
-            self.inner
-                .write_u8(marker::HI_PRECISION)
-                .map_err(Error::Io)
-                .and_then(|_| self.serialize_u64(v.len() as u64))
-                .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
+            self.inner.write_u8(marker::HI_PRECISION)?;
+            self.serialize_u64(v.len() as u64)?;
+            self.inner.write_all(v.as_bytes())?;
+            Ok(())
         }
     }
 
     fn serialize_f32(self, v: f32) -> Result<()> {
-        self.inner
-            .write_u8(marker::F32)
-            .and_then(|_| self.inner.write_f32::<BigEndian>(v))
-            .map_err(Error::Io)
+        self.inner.write_u8(marker::F32)?;
+        self.inner.write_f32::<BigEndian>(v)?;
+        Ok(())
     }
 
     fn serialize_f64(self, v: f64) -> Result<()> {
-        self.inner
-            .write_u8(marker::F64)
-            .and_then(|_| self.inner.write_f64::<BigEndian>(v))
-            .map_err(Error::Io)
+        self.inner.write_u8(marker::F64)?;
+        self.inner.write_f64::<BigEndian>(v)?;
+        Ok(())
     }
 
     fn serialize_char(self, v: char) -> Result<()> {
         let v: u32 = v.into();
         if v <= 127 {
-            self.inner
-                .write_u8(marker::CHAR)
-                .and_then(|_| self.inner.write_u8(v as u8))
-                .map_err(Error::Io)
+            self.inner.write_u8(marker::CHAR)?;
+            self.inner.write_u8(v as u8)?;
+            Ok(())
         } else {
             self.serialize_u32(v)
         }
     }
 
     fn serialize_str(self, v: &str) -> Result<()> {
-        self.inner
-            .write_u8(marker::STRING)
-            .map_err(Error::Io)
-            .and_then(|_| self.serialize_u64(v.len() as u64))
-            .and_then(|_| self.inner.write_all(v.as_bytes()).map_err(Error::Io))
+        self.inner.write_u8(marker::STRING)?;
+        self.serialize_u64(v.len() as u64)?;
+        self.inner.write_all(v.as_bytes())?;
+        Ok(())
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        self.inner
-            .write_all(b"[$U#") // TODO: change this to use marker stuff
-            .map_err(Error::Io)
-            .and_then(|_| self.serialize_u64(v.len() as u64))
-            .and_then(|_| self.inner.write_all(v).map_err(Error::Io))
+        let header = [marker::ARR_START, marker::TYPE, marker::U8, marker::LENGTH];
+        self.inner.write_all(&header)?;
+        self.serialize_u64(v.len() as u64)?;
+        self.inner.write_all(v).map_err(Error::Io)?;
+        Ok(())
     }
 
     fn serialize_none(self) -> Result<()> {
@@ -239,30 +229,25 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
+        self.inner.write_u8(marker::ARR_START)?;
         if let Some(len) = len {
-            self.inner
-                .write_all(b"[#") // TODO: change this too
-                .map_err(Error::Io)?;
+            self.inner.write_u8(marker::LENGTH)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
                    ser: self,
                    length_known: true,
-               })
+            })
         } else {
-            self.inner
-                .write_u8(marker::ARR_START)
-                .map_err(Error::Io)?;
             Ok(Dynamic {
                    ser: self,
                    length_known: false,
-               })
+            })
         }
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
-        self.inner
-            .write_all(b"[#") // TODO: change this too
-            .map_err(Error::Io)?;
+        let header = [marker::ARR_START, marker::LENGTH];
+        self.inner.write_all(&header)?;
         self.serialize_u64(len as u64)?;
         Ok(Static { ser: self })
     }
@@ -286,23 +271,19 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
+        self.inner.write_u8(marker::OBJ_START)?;
         if let Some(len) = len {
-            self.inner
-                .write_all(b"{#") // TODO: change this too
-                .map_err(Error::Io)?;
+            self.inner.write_u8(marker::LENGTH)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
                    ser: self,
                    length_known: true,
-               })
+            })
         } else {
-            self.inner
-                .write_u8(marker::OBJ_START)
-                .map_err(Error::Io)?;
             Ok(Dynamic {
                    ser: self,
                    length_known: false,
-               })
+            })
         }
     }
 
@@ -435,14 +416,10 @@ impl<'a, W: 'a> ser::SerializeSeq for Dynamic<'a, W>
     }
 
     fn end(self) -> Result<()> {
-        if self.length_known {
-            Ok(())
-        } else {
-            self.ser
-                .inner
-                .write_u8(marker::ARR_END)
-                .map_err(Error::Io)
+        if !self.length_known {
+            self.ser.inner.write_u8(marker::ARR_END)?;
         }
+        Ok(())
     }
 }
 
@@ -465,14 +442,10 @@ impl<'a, W: 'a> ser::SerializeMap for Dynamic<'a, W>
     }
 
     fn end(self) -> Result<()> {
-        if self.length_known {
-            Ok(())
-        } else {
-            self.ser
-                .inner
-                .write_u8(marker::OBJ_END)
-                .map_err(Error::Io)
+        if !self.length_known {
+            self.ser.inner.write_u8(marker::OBJ_END)?;
         }
+        Ok(())
     }
 }
 
@@ -496,10 +469,8 @@ impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
 
     fn serialize_str(self, v: &str) -> Result<()> {
         v.len().serialize(&mut *self.ser)?;
-        self.ser
-            .inner
-            .write_all(v.as_bytes())
-            .map_err(Error::Io)
+        self.ser.inner.write_all(v.as_bytes())?;
+        Ok(())
     }
 
     fn serialize_bool(self, _v: bool) -> Result<()> {

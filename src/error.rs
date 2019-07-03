@@ -44,3 +44,9 @@ impl de::Error for Error {
         Error::Message(msg.to_string())
     }
 }
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
+    }
+}
