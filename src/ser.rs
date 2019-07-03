@@ -5,14 +5,15 @@ use std::io::Write;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::{self, Impossible, Serialize};
 
-use crate::marker;
 use crate::error::{Error, Result};
+use crate::marker;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Serialize the given value as a UBJSON byte vector.
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
-    where T: Serialize
+where
+    T: Serialize,
 {
     let mut serializer = Serializer::new(Vec::new());
     value.serialize(&mut serializer)?;
@@ -21,8 +22,9 @@ pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
 
 /// Serialize the given value as UBJSON into the IO stream.
 pub fn to_writer<T, W>(writer: W, value: &T) -> Result<()>
-    where W: Write,
-          T: Serialize
+where
+    W: Write,
+    T: Serialize,
 {
     let mut serializer = Serializer::new(writer);
     value.serialize(&mut serializer)?;
@@ -37,7 +39,8 @@ pub struct Serializer<W> {
 }
 
 impl<W> Serializer<W>
-    where W: Write
+where
+    W: Write,
 {
     /// Creates a new UBJSON serializer.
     pub fn new(writer: W) -> Self {
@@ -63,7 +66,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     type SerializeStructVariant = Static<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
-        self.inner.write_u8(if v { marker::TRUE } else { marker::FALSE }).map_err(Error::Io)
+        self.inner
+            .write_u8(if v { marker::TRUE } else { marker::FALSE })
+            .map_err(Error::Io)
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
@@ -187,7 +192,8 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         value.serialize(self)
     }
@@ -200,27 +206,31 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_none()
     }
 
-    fn serialize_unit_variant(self,
-                              _name: &'static str,
-                              variant_index: u32,
-                              _variant: &'static str)
-                              -> Result<()> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<()> {
         self.serialize_u32(variant_index)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(self,
-                                            _name: &'static str,
-                                            variant_index: u32,
-                                            _variant: &'static str,
-                                            value: &T)
-                                            -> Result<()>
-        where T: Serialize
+    fn serialize_newtype_variant<T: ?Sized>(
+        self,
+        _name: &'static str,
+        variant_index: u32,
+        _variant: &'static str,
+        value: &T,
+    ) -> Result<()>
+    where
+        T: Serialize,
     {
         let mut tup = self.serialize_tuple(2)?;
         ser::SerializeTuple::serialize_element(&mut tup, &variant_index)?;
@@ -234,13 +244,13 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.inner.write_u8(marker::LENGTH)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
-                   ser: self,
-                   length_known: true,
+                ser: self,
+                length_known: true,
             })
         } else {
             Ok(Dynamic {
-                   ser: self,
-                   length_known: false,
+                ser: self,
+                length_known: false,
             })
         }
     }
@@ -252,19 +262,21 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         Ok(Static { ser: self })
     }
 
-    fn serialize_tuple_struct(self,
-                              _name: &'static str,
-                              len: usize)
-                              -> Result<Self::SerializeTupleStruct> {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct> {
         self.serialize_tuple(len)
     }
 
-    fn serialize_tuple_variant(self,
-                               _name: &'static str,
-                               variant_index: u32,
-                               _variant: &'static str,
-                               len: usize)
-                               -> Result<Self::SerializeTupleVariant> {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        variant_index: u32,
+        _variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant> {
         let mut tup = self.serialize_tuple(len + 1)?;
         ser::SerializeTuple::serialize_element(&mut tup, &variant_index)?;
         Ok(tup)
@@ -276,13 +288,13 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             self.inner.write_u8(marker::LENGTH)?;
             len.serialize(&mut *self)?;
             Ok(Dynamic {
-                   ser: self,
-                   length_known: true,
+                ser: self,
+                length_known: true,
             })
         } else {
             Ok(Dynamic {
-                   ser: self,
-                   length_known: false,
+                ser: self,
+                length_known: false,
             })
         }
     }
@@ -291,12 +303,13 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_tuple(len)
     }
 
-    fn serialize_struct_variant(self,
-                                name: &'static str,
-                                variant_index: u32,
-                                variant: &'static str,
-                                len: usize)
-                                -> Result<Self::SerializeStructVariant> {
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant> {
         self.serialize_tuple_variant(name, variant_index, variant, len)
     }
 }
@@ -310,13 +323,15 @@ pub struct Static<'a, W: 'a> {
 }
 
 impl<'a, W: 'a> ser::SerializeTuple for Static<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         value.serialize(&mut *self.ser)
     }
@@ -327,13 +342,15 @@ impl<'a, W: 'a> ser::SerializeTuple for Static<'a, W>
 }
 
 impl<'a, W: 'a> ser::SerializeTupleStruct for Static<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         ser::SerializeTuple::serialize_element(self, value)
     }
@@ -344,13 +361,15 @@ impl<'a, W: 'a> ser::SerializeTupleStruct for Static<'a, W>
 }
 
 impl<'a, W: 'a> ser::SerializeTupleVariant for Static<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         ser::SerializeTuple::serialize_element(self, value)
     }
@@ -361,13 +380,15 @@ impl<'a, W: 'a> ser::SerializeTupleVariant for Static<'a, W>
 }
 
 impl<'a, W: 'a> ser::SerializeStruct for Static<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         ser::SerializeTuple::serialize_element(self, value)
     }
@@ -378,13 +399,15 @@ impl<'a, W: 'a> ser::SerializeStruct for Static<'a, W>
 }
 
 impl<'a, W: 'a> ser::SerializeStructVariant for Static<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         ser::SerializeTuple::serialize_element(self, value)
     }
@@ -404,13 +427,15 @@ pub struct Dynamic<'a, W: 'a> {
 }
 
 impl<'a, W: 'a> ser::SerializeSeq for Dynamic<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         value.serialize(&mut *self.ser)
     }
@@ -424,19 +449,24 @@ impl<'a, W: 'a> ser::SerializeSeq for Dynamic<'a, W>
 }
 
 impl<'a, W: 'a> ser::SerializeMap for Dynamic<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
-        key.serialize(MapKeySerializer { ser: &mut *self.ser })
+        key.serialize(MapKeySerializer {
+            ser: &mut *self.ser,
+        })
     }
 
     fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         value.serialize(&mut *self.ser)
     }
@@ -454,7 +484,8 @@ struct MapKeySerializer<'a, W: 'a> {
 }
 
 impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
-    where W: Write
+where
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
@@ -530,7 +561,8 @@ impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
     }
 
     fn serialize_some<T: ?Sized>(self, _v: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         Err(Error::KeyMustBeAString)
     }
@@ -543,27 +575,31 @@ impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
         Err(Error::KeyMustBeAString)
     }
 
-    fn serialize_unit_variant(self,
-                              _name: &'static str,
-                              _variant_index: u32,
-                              _variant: &'static str)
-                              -> Result<()> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<()> {
         Err(Error::KeyMustBeAString)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, _value: &T) -> Result<()>
-        where T: Serialize
+    where
+        T: Serialize,
     {
         Err(Error::KeyMustBeAString)
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(self,
-                                            _name: &'static str,
-                                            _variant_index: u32,
-                                            _variant: &'static str,
-                                            _value: &T)
-                                            -> Result<()>
-        where T: Serialize
+    fn serialize_newtype_variant<T: ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _value: &T,
+    ) -> Result<()>
+    where
+        T: Serialize,
     {
         Err(Error::KeyMustBeAString)
     }
@@ -576,19 +612,21 @@ impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
         Err(Error::KeyMustBeAString)
     }
 
-    fn serialize_tuple_struct(self,
-                              _name: &'static str,
-                              _len: usize)
-                              -> Result<Self::SerializeTupleStruct> {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct> {
         Err(Error::KeyMustBeAString)
     }
 
-    fn serialize_tuple_variant(self,
-                               _name: &'static str,
-                               _variant_index: u32,
-                               _variant: &'static str,
-                               _len: usize)
-                               -> Result<Self::SerializeTupleVariant> {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant> {
         Err(Error::KeyMustBeAString)
     }
 
@@ -600,12 +638,13 @@ impl<'a, W> ser::Serializer for MapKeySerializer<'a, W>
         Err(Error::KeyMustBeAString)
     }
 
-    fn serialize_struct_variant(self,
-                                _name: &'static str,
-                                _variant_index: u32,
-                                _variant: &'static str,
-                                _len: usize)
-                                -> Result<Self::SerializeStructVariant> {
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant> {
         Err(Error::KeyMustBeAString)
     }
 }

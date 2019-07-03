@@ -46,7 +46,7 @@ fn serialize_i16() {
         (i16::from(i8::min_value()),     b"i\x80"),
         (0i16,                           b"i\x00"),
         (i16::from(i8::max_value()),     b"i\x7f"),
-        (i16::from(i8::max_value())+ 1,  b"U\x80"),
+        (i16::from(i8::max_value()) + 1, b"U\x80"),
         (i16::from(u8::max_value()),     b"U\xff"),
         (i16::from(u8::max_value()) + 1, b"I\x01\x00"),
         (i16::max_value(),               b"I\x7f\xff"),

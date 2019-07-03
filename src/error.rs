@@ -1,8 +1,8 @@
 use std;
-use std::io;
 use std::fmt::{self, Display};
+use std::io;
 
-use serde::{ser, de};
+use serde::{de, ser};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -31,7 +31,8 @@ impl std::error::Error for Error {
 
 impl ser::Error for Error {
     fn custom<T>(msg: T) -> Self
-        where T: Display
+    where
+        T: Display,
     {
         Error::Message(msg.to_string())
     }
@@ -39,7 +40,8 @@ impl ser::Error for Error {
 
 impl de::Error for Error {
     fn custom<T>(msg: T) -> Self
-        where T: Display
+    where
+        T: Display,
     {
         Error::Message(msg.to_string())
     }
