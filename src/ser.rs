@@ -5,7 +5,7 @@ use std::io::Write;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::{self, Impossible, Serialize};
 
-use error::{Error, Result};
+use crate::error::{Error, Result};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -73,9 +73,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i16(self, v: i16) -> Result<()> {
-        if (i8::min_value() as i16 <= v) && (v <= i8::max_value() as i16) {
+        if (i16::from(i8::min_value()) <= v) && (v <= i16::from(i8::max_value())) {
             self.serialize_i8(v as i8)
-        } else if (u8::min_value() as i16 <= v) && (v <= u8::max_value() as i16) {
+        } else if (i16::from(u8::min_value()) <= v) && (v <= i16::from(u8::max_value())) {
             self.serialize_u8(v as u8)
         } else {
             self.inner
@@ -86,7 +86,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i32(self, v: i32) -> Result<()> {
-        if (i16::min_value() as i32 <= v) && (v <= i16::max_value() as i32) {
+        if (i32::from(i16::min_value()) <= v) && (v <= i32::from(i16::max_value())) {
             self.serialize_i16(v as i16)
         } else {
             self.inner
@@ -97,7 +97,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i64(self, v: i64) -> Result<()> {
-        if (i32::min_value() as i64 <= v) && (v <= i32::max_value() as i64) {
+        if (i64::from(i32::min_value()) <= v) && (v <= i64::from(i32::max_value())) {
             self.serialize_i32(v as i32)
         } else {
             self.inner
@@ -115,27 +115,27 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_u16(self, v: u16) -> Result<()> {
-        if v <= u8::max_value() as u16 {
+        if v <= u16::from(u8::max_value()) {
             self.serialize_u8(v as u8)
         } else if v <= i16::max_value() as u16 {
             self.serialize_i16(v as i16)
         } else {
-            self.serialize_i32(v as i32)
+            self.serialize_i32(i32::from(v))
         }
     }
 
     fn serialize_u32(self, v: u32) -> Result<()> {
-        if v <= u16::max_value() as u32 {
+        if v <= u32::from(u16::max_value()) {
             self.serialize_u16(v as u16)
         } else if v <= i32::max_value() as u32 {
             self.serialize_i32(v as i32)
         } else {
-            self.serialize_i64(v as i64)
+            self.serialize_i64(i64::from(v))
         }
     }
 
     fn serialize_u64(self, v: u64) -> Result<()> {
-        if v <= u32::max_value() as u64 {
+        if v <= u64::from(u32::max_value()) {
             self.serialize_u32(v as u32)
         } else if v <= i64::max_value() as u64 {
             self.serialize_i64(v as i64)

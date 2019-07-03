@@ -1,6 +1,7 @@
 [package]
 name = "serde_ubjson"
 version = "0.2.1"
+edition = "2018"
 authors = ["Jewoo Lee <shema7k@gmail.com>"]
 license = "MIT"
 description = "UBJSON support for Serde"
